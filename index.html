@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0F14">
+<title>Get Buff Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#0B0F14; --card:#151C25; --card2:#1B2531; --line:#26303D;
+  --text:#E9EEF4; --muted:#8A99AB;
+  --accent:#FF6B35; --accent-dim:#7A3419;
+  --good:#22C55E; --warn:#F59E0B; --bad:#EF4444;
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:640px;margin:0 auto;padding:16px 16px 8px}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.02em}
+h1{font-size:26px}
+h2{font-size:19px;margin:22px 0 10px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.tiny{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
+
+/* header */
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:16px}
+.datebar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.datebar button{
+  background:var(--card);border:1px solid var(--line);color:var(--text);
+  width:38px;height:38px;border-radius:11px;font-size:17px;cursor:pointer;flex:0 0 auto;
+}
+.datebar button:disabled{opacity:.3;cursor:default}
+.datebar .d{flex:1;text-align:center;font-weight:700}
+.locked{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted)}
+
+/* score ring */
+.scorecard{
+  background:linear-gradient(150deg,var(--card2),var(--card));
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:18px;display:flex;align-items:center;gap:18px;margin-bottom:20px
+}
+.ring{position:relative;width:92px;height:92px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg)}
+.ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .val b{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.ring .val span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+.scoretext{flex:1;min-width:0}
+.scoretext .hd{font-size:17px;font-weight:800;margin-bottom:3px}
+.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.pill.good{background:rgba(34,197,94,.16);color:var(--good)}
+.pill.warn{background:rgba(245,158,11,.16);color:var(--warn)}
+.pill.bad{background:rgba(239,68,68,.15);color:var(--bad)}
+
+/* habit rows */
+.habits{display:flex;flex-direction:column;gap:10px}
+.habit{
+  display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:15px 16px;color:var(--text);font:inherit;cursor:pointer;
+  transition:background .12s,border-color .12s,transform .06s;
+}
+.habit:active{transform:scale(.985)}
+.habit[aria-pressed="true"]{background:rgba(34,197,94,.09);border-color:rgba(34,197,94,.4)}
+.habit[disabled]{opacity:.45;cursor:default}
+.box{
+  width:30px;height:30px;flex:0 0 auto;border-radius:9px;
+  border:2px solid var(--line);display:grid;place-items:center;transition:.12s;
+}
+.habit[aria-pressed="true"] .box{background:var(--good);border-color:var(--good)}
+.box svg{opacity:0;transition:.12s}
+.habit[aria-pressed="true"] .box svg{opacity:1}
+.habit .txt{flex:1;min-width:0}
+.habit .txt b{display:block;font-weight:700;font-size:15.5px}
+.habit .txt span{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.habit .cnt{font-size:12px;font-weight:800;color:var(--muted);flex:0 0 auto}
+.habit[aria-pressed="true"] .cnt{color:var(--good)}
+
+/* generic card */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+label.f{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600}
+input[type=text],input[type=number],input[type=email]{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;
+  color:var(--text);padding:12px 13px;font:inherit;
+}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+button.btn{
+  background:var(--accent);border:0;color:#fff;font:inherit;font-weight:800;
+  padding:13px 18px;border-radius:12px;cursor:pointer;width:100%;
+}
+button.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);font-weight:700}
+button.btn:active{filter:brightness(.92)}
+.unit-toggle{display:flex;gap:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.unit-toggle button{flex:1;background:transparent;border:0;color:var(--muted);font:inherit;font-weight:700;font-size:13px;padding:7px 0;cursor:pointer}
+.unit-toggle button[aria-pressed="true"]{background:var(--accent);color:#fff}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.stat .v{font-size:22px;font-weight:800;letter-spacing:-.03em;margin-top:4px}
+.stat .v.good{color:var(--good)} .stat .v.bad{color:var(--bad)}
+.stat .s{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* chart */
+.chart{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 12px 8px;margin-bottom:12px}
+.chart .legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);padding:0 4px 8px}
+.chart .legend i{display:inline-block;width:16px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+svg.plot{width:100%;height:auto;display:block;overflow:visible}
+
+/* history */
+.wk{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.wk .h{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;gap:10px}
+.wk .h b{font-size:14.5px}
+.grid{display:grid;grid-template-columns:78px repeat(7,1fr);gap:5px;align-items:center}
+.grid .lbl{font-size:11px;color:var(--muted);font-weight:600}
+.grid .dow{font-size:10px;color:var(--muted);text-align:center;font-weight:700}
+.dot{aspect-ratio:1;border-radius:6px;background:var(--card2);border:1px solid var(--line)}
+.dot.on{background:var(--good);border-color:var(--good)}
+.dot.na{opacity:.25}
+
+/* nav */
+nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:rgba(11,15,20,.94);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);display:flex;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;background:none;border:0;color:var(--muted);font:inherit;font-size:11px;font-weight:700;
+  padding:11px 0 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;
+  border-top:2px solid transparent;margin-top:-1px;
+}
+nav button[aria-current="page"]{color:var(--accent);border-top-color:var(--accent)}
+nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hidden{display:none!important}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));
+  background:var(--card2);border:1px solid var(--line);color:var(--text);
+  padding:10px 16px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:30;
+  opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.5)
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ============ SIGN IN (only when Supabase is configured) ============ -->
+<section id="auth" class="wrap hidden">
+  <h1 style="margin:40px 0 8px">Get Buff Tracker</h1>
+  <p class="muted small" style="margin:0 0 24px">Private. Sign in with a link sent to your email — no password to remember.</p>
+  <div class="card">
+    <label class="f" for="email">Email address</label>
+    <input type="email" id="email" inputmode="email" autocomplete="email" placeholder="you@example.com">
+    <div style="height:12px"></div>
+    <button class="btn" id="sendLink">Email me a sign-in link</button>
+    <p class="small muted" id="authMsg" style="margin:12px 0 0"></p>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<main id="app" class="hidden">
+
+  <!-- ---------- TODAY ---------- -->
+  <section id="view-today" class="wrap">
+    <header class="top">
+      <div>
+        <div class="tiny">Today</div>
+        <h1 id="todayTitle">—</h1>
+      </div>
+    </header>
+
+    <div class="datebar">
+      <button id="prevDay" aria-label="Previous day">‹</button>
+      <div class="d" id="dayLabel">—</div>
+      <button id="nextDay" aria-label="Next day">›</button>
+    </div>
+
+    <div id="lockedNote" class="locked hidden">Locked — you can only edit the last 4 days (today plus 3 back).</div>
+
+    <div class="scorecard">
+      <div class="ring">
+        <svg width="92" height="92" viewBox="0 0 92 92">
+          <circle cx="46" cy="46" r="39" stroke="#26303D" stroke-width="9" fill="none"/>
+          <circle id="ringArc" cx="46" cy="46" r="39" stroke="#22C55E" stroke-width="9" fill="none"
+                  stroke-linecap="round" stroke-dasharray="245" stroke-dashoffset="245"/>
+        </svg>
+        <div class="val"><b id="ringPct">0%</b><span>This week</span></div>
+      </div>
+      <div class="scoretext">
+        <div class="hd" id="weekHd">This week</div>
+        <div class="small muted" id="weekSub">—</div>
+        <div style="margin-top:8px"><span class="pill warn" id="weekPill">In progress</span></div>
+      </div>
+    </div>
+
+    <div class="habits" id="habitList"></div>
+
+    <h2>Bonus activity</h2>
+    <div class="card">
+      <label class="f" for="bonus">Anything extra today — swim, gym, long walk. Never required.</label>
+      <input type="text" id="bonus" placeholder="e.g. 40 min swim">
+    </div>
+
+    <div id="weighBlock"></div>
+  </section>
+
+  <!-- ---------- PROGRESS ---------- -->
+  <section id="view-progress" class="wrap hidden">
+    <header class="top"><div><div class="tiny">Progress</div><h1>The numbers</h1></div></header>
+    <div class="stats" id="progStats"></div>
+
+    <div class="chart">
+      <div class="legend">
+        <span><i style="background:#FF6B35"></i>Your weight</span>
+        <span><i style="background:#8A99AB"></i>Target pace</span>
+      </div>
+      <svg class="plot" id="weightChart" viewBox="0 0 340 190" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="chart">
+      <div class="legend">
+        <span><i style="background:#38BDF8"></i>Your waist</span>
+        <span><i style="background:#8A99AB"></i>Target pace (estimate)</span>
+      </div>
+      <svg class="plot" id="waistChart" viewBox="0 0 340 150" preserveAspectRatio="none"></svg>
+    </div>
+
+    <h2>Milestones</h2>
+    <div class="card" id="milestones"></div>
+  </section>
+
+  <!-- ---------- HISTORY ---------- -->
+  <section id="view-history" class="wrap hidden">
+    <header class="top"><div><div class="tiny">History</div><h1>Every week</h1></div></header>
+    <div class="stats" id="histStats"></div>
+    <div id="weekList"></div>
+    <div class="card">
+      <button class="btn ghost" id="exportBtn">Export all data (CSV)</button>
+      <div style="height:8px"></div>
+      <button class="btn ghost" id="signOutBtn">Sign out</button>
+    </div>
+  </section>
+</main>
+
+<nav id="nav" class="hidden">
+  <button data-view="today" aria-current="page">
+    <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Today
+  </button>
+  <button data-view="progress">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M19 9l-5 5-4-4-3 3"/></svg>
+    Progress
+  </button>
+  <button data-view="history">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    History
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   CONFIG — the only part you ever need to edit
+   ============================================================ */
+const CONFIG = {
+  // Leave both blank to run on this device only (localStorage).
+  // Fill them in after creating the Supabase project to sync phone + desktop.
+  supabaseUrl:     '',
+  supabaseAnonKey: '',
+
+  start:     { date:'2026-09-06', lb:256, waist:49 },
+  milestone: { date:'2026-12-25', lb:224, waist:43, label:'Christmas' },
+  goal:      { date:'2027-04-30', lb:189, waist:36, label:'Goal' },
+
+  weighInDow:   1,    // 1 = Monday
+  dryTarget:    4,    // alcohol-free days per week that count toward the score
+  backfillDays: 3,    // how many days back you may still tick
+  threshold:    0.80  // weekly % needed for a green week
+};
+
+const DAILY = [
+  { key:'walk',  label:'30-minute walk',    sub:'Non-negotiable' },
+  { key:'core',  label:'10-minute core',    sub:'Plank, press-ups, whatever hurts' },
+  { key:'dry',   label:'Alcohol-free day',  sub:'Counts up to 4 a week' },
+  { key:'water', label:'2 litres of water', sub:'' }
+];
+
+/* ============================================================
+   Date helpers (local time, no timezone surprises)
+   ============================================================ */
+const DAY_MS = 86400000;
+const toDate = iso => new Date(iso + 'T12:00:00');
+const isoOf  = d  => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const todayISO = () => isoOf(new Date());
+const addDays = (iso,n) => { const d = toDate(iso); d.setDate(d.getDate()+n); return isoOf(d); };
+const daysBetween = (a,b) => Math.round((toDate(b) - toDate(a)) / DAY_MS);
+const weekStart = iso => { const d = toDate(iso); const dow = (d.getDay()+6)%7; d.setDate(d.getDate()-dow); return isoOf(d); };
+const weekDays  = ws => Array.from({length:7}, (_,i) => addDays(ws,i));
+const fmtDay  = iso => toDate(iso).toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
+const fmtShort= iso => toDate(iso).toLocaleDateString('en-GB',{day:'numeric', month:'short'});
+
+/* ============================================================
+   Units
+   ============================================================ */
+const LB_PER_KG = 2.20462262;
+let unit = localStorage.getItem('gbt.unit') || 'stlb';
+function fmtWeight(lb, withUnit=true){
+  if (lb == null) return '—';
+  if (unit === 'kg') return (lb/LB_PER_KG).toFixed(1) + (withUnit ? ' kg' : '');
+  const st = Math.floor(lb/14);
+  const rem = Math.round((lb - st*14)*10)/10;
+  return `${st}st ${rem}lb`;
+}
+function fmtDelta(lb){
+  if (lb == null) return '—';
+  const a = Math.abs(lb);
+  if (unit === 'kg') return (a/LB_PER_KG).toFixed(1) + ' kg';
+  if (a < 14) return `${Math.round(a*10)/10}lb`;
+  const st = Math.floor(a/14), rem = Math.round((a - st*14)*10)/10;
+  return `${st}st ${rem}lb`;
+}
+
+/* ============================================================
+   Storage — Supabase when configured, otherwise this device
+   ============================================================ */
+const BLANK = day => ({ day, walk:false, core:false, dry:false, water:false, prep:false, bonus:'', weight_lb:null, waist_in:null });
+const usingCloud = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+
+let sb = null;          // supabase client
+let logs = {};          // { '2026-09-06': row }
+
+const Local = {
+  load(){ try { return JSON.parse(localStorage.getItem('gbt.logs') || '{}'); } catch { return {}; } },
+  save(){ localStorage.setItem('gbt.logs', JSON.stringify(logs)); }
+};
+
+async function loadAll(){
+  if (!usingCloud()) { logs = Local.load(); return; }
+  const { data, error } = await sb.from('logs').select('*');
+  if (error) { toast('Could not load: ' + error.message); return; }
+  logs = {};
+  for (const r of data) logs[r.day] = r;
+}
+
+let saveTimer = null, pending = new Set();
+function queueSave(day){
+  pending.add(day);
+  Local.save();                                   // always keep a local copy
+  if (!usingCloud()) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 600);
+}
+async function flush(){
+  if (!usingCloud() || !pending.size) return;
+  const rows = [...pending].map(d => {
+    const { day, walk, core, dry, water, prep, bonus, weight_lb, waist_in } = logs[d];
+    return { day, walk, core, dry, water, prep, bonus, weight_lb, waist_in, user_id: sb.auth.__uid };
+  });
+  pending.clear();
+  const { error } = await sb.from('logs').upsert(rows, { onConflict:'user_id,day' });
+  if (error) toast('Sync failed — saved on this device');
+}
+
+function get(day){ return logs[day] || (logs[day] = BLANK(day)); }
+
+/* ============================================================
+   Scoring
+   ============================================================ */
+function weekStats(ws, today){
+  const days = weekDays(ws);
+  const t = today || todayISO();
+  // Only days that have actually happened AND are on/after the start date can be expected of you.
+  const elapsed = days.filter(d => d <= t && d >= CONFIG.start.date).length;
+  let walk=0, core=0, water=0, dry=0, prep=false, weighed=false;
+  for (const d of days){
+    const r = logs[d]; if (!r) continue;
+    if (r.walk) walk++;
+    if (r.core) core++;
+    if (r.water) water++;
+    if (r.dry) dry++;
+    if (r.prep) prep = true;
+    if (r.weight_lb != null) weighed = true;
+  }
+  const dryCounted = Math.min(dry, CONFIG.dryTarget);
+  // Meal prep is a once-a-week job — it only starts counting from Friday, so doing it
+  // late in the week doesn't drag Monday's score down.
+  const prepCounts = elapsed >= 5;
+  const earned = walk + core + water + dryCounted + (prepCounts && prep ? 1:0) + (weighed?1:0);
+  const target = elapsed*3 + Math.min(CONFIG.dryTarget, elapsed) + (elapsed>0?1:0) + (prepCounts?1:0);
+  const pct = target ? Math.min(1, earned/target) : 0;
+  return { days, elapsed, walk, core, water, dry, dryCounted, prep, weighed, earned, target, pct,
+           complete: elapsed === 7 };
+}
+
+/* ============================================================
+   Pace line
+   ============================================================ */
+const lerp = (a,b,t) => a + (b-a)*t;
+function paceOn(iso, field){
+  const s=CONFIG.start, m=CONFIG.milestone, g=CONFIG.goal;
+  const x = toDate(iso), ds = toDate(s.date), dm = toDate(m.date), dg = toDate(g.date);
+  if (x <= ds) return s[field];
+  if (x <= dm) return lerp(s[field], m[field], (x-ds)/(dm-ds));
+  if (x <= dg) return lerp(m[field], g[field], (x-dm)/(dg-dm));
+  return g[field];
+}
+function measurements(){
+  return Object.values(logs)
+    .filter(r => r.weight_lb != null || r.waist_in != null)
+    .sort((a,b) => a.day < b.day ? -1 : 1);
+}
+function latest(field){
+  const ms = measurements().filter(r => r[field] != null);
+  return ms.length ? ms[ms.length-1] : null;
+}
+
+/* ============================================================
+   State + rendering
+   ============================================================ */
+let view = 'today';
+let cursor = todayISO();
+
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const editable = iso => iso <= todayISO() && daysBetween(iso, todayISO()) <= CONFIG.backfillDays;
+
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function render(){
+  $('#view-today').classList.toggle('hidden', view!=='today');
+  $('#view-progress').classList.toggle('hidden', view!=='progress');
+  $('#view-history').classList.toggle('hidden', view!=='history');
+  $$('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.view===view ? 'page' : 'false'));
+  if (view==='today') renderToday();
+  if (view==='progress') renderProgress();
+  if (view==='history') renderHistory();
+}
+
+/* ---------- Today ---------- */
+function renderToday(){
+  const r = get(cursor);
+  const can = editable(cursor);
+  const isToday = cursor === todayISO();
+
+  $('#todayTitle').textContent = isToday ? 'Get after it' : fmtShort(cursor);
+  $('#dayLabel').textContent = isToday ? 'Today · ' + fmtDay(cursor) : fmtDay(cursor);
+  $('#nextDay').disabled = cursor >= todayISO();
+  $('#prevDay').disabled = cursor <= CONFIG.start.date;
+  $('#lockedNote').classList.toggle('hidden', can);
+
+  // week score
+  const ws = weekStart(cursor), st = weekStats(ws);
+  const pct = Math.round(st.pct*100);
+  const C = 2*Math.PI*39;
+  const arc = $('#ringArc');
+  arc.style.strokeDasharray = C;
+  arc.style.strokeDashoffset = C * (1 - Math.min(1, st.pct));
+  arc.setAttribute('stroke', st.pct >= CONFIG.threshold ? '#22C55E' : st.pct >= 0.5 ? '#F59E0B' : '#EF4444');
+  $('#ringPct').textContent = pct + '%';
+  $('#weekHd').textContent = 'Week of ' + fmtShort(ws);
+  const pill = $('#weekPill');
+  if (st.elapsed === 0){
+    arc.setAttribute('stroke', '#3A4756');
+    $('#weekSub').textContent = 'Not started yet';
+    pill.className = 'pill warn'; pill.textContent = 'Upcoming';
+  } else {
+    $('#weekSub').textContent = `${st.earned} of ${st.target} ticks${st.complete ? '' : ' so far'}`;
+    if (st.pct >= CONFIG.threshold){ pill.className='pill good'; pill.textContent = st.complete ? 'Green week' : 'On track'; }
+    else if (st.complete){ pill.className='pill bad'; pill.textContent='Missed'; }
+    else {
+      const need = Math.max(0, Math.ceil(st.target*CONFIG.threshold - st.earned));
+      pill.className='pill warn'; pill.textContent = need ? `${need} more for green` : 'On track';
+    }
+  }
+
+  // habits
+  const list = $('#habitList'); list.innerHTML = '';
+  const tick = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B0F14" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
+  for (const h of DAILY){
+    const on = !!r[h.key];
+    const b = document.createElement('button');
+    b.className = 'habit';
+    b.setAttribute('aria-pressed', on);
+    if (!can) b.disabled = true;
+    let cnt = '';
+    if (h.key === 'dry')  cnt = `${st.dry}/${CONFIG.dryTarget}`;
+    if (h.key === 'walk') cnt = `${st.walk}/7`;
+    if (h.key === 'core') cnt = `${st.core}/7`;
+    if (h.key === 'water')cnt = `${st.water}/7`;
+    b.innerHTML = `<span class="box">${tick}</span>
+      <span class="txt"><b>${h.label}</b>${h.sub ? `<span>${h.sub}</span>` : ''}</span>
+      <span class="cnt">${cnt}</span>`;
+    b.onclick = () => { r[h.key] = !r[h.key]; queueSave(cursor); renderToday(); };
+    list.appendChild(b);
+  }
+
+  // weekly meal prep
+  const prep = document.createElement('button');
+  prep.className = 'habit'; prep.style.marginTop = '10px';
+  prep.setAttribute('aria-pressed', !!r.prep);
+  if (!can) prep.disabled = true;
+  prep.innerHTML = `<span class="box">${tick}</span>
+    <span class="txt"><b>Meals planned &amp; prepped</b><span>Weekly — tick it on the day you do it</span></span>
+    <span class="cnt">${st.prep ? 'done' : '0/1'}</span>`;
+  prep.onclick = () => { r.prep = !r.prep; queueSave(cursor); renderToday(); };
+  list.appendChild(prep);
+
+  // bonus
+  const bonus = $('#bonus');
+  bonus.value = r.bonus || '';
+  bonus.disabled = !can;
+  bonus.oninput = () => { r.bonus = bonus.value; queueSave(cursor); };
+
+  renderWeighBlock(r, can);
+}
+
+function renderWeighBlock(r, can){
+  const el = $('#weighBlock');
+  const dow = (toDate(cursor).getDay()+6)%7 + 1;   // 1 = Monday
+  const isWeighDay = dow === CONFIG.weighInDow;
+  const has = r.weight_lb != null || r.waist_in != null;
+
+  if (!isWeighDay && !has){ el.innerHTML = ''; return; }
+
+  const stVal = r.weight_lb != null ? Math.floor(r.weight_lb/14) : '';
+  const lbVal = r.weight_lb != null ? Math.round((r.weight_lb - Math.floor(r.weight_lb/14)*14)*10)/10 : '';
+  const kgVal = r.weight_lb != null ? Math.round(r.weight_lb/LB_PER_KG*10)/10 : '';
+
+  el.innerHTML = `
+    <h2>Monday weigh-in</h2>
+    <div class="card">
+      <div class="unit-toggle" style="margin-bottom:14px">
+        <button id="u-stlb" aria-pressed="${unit==='stlb'}">st / lb</button>
+        <button id="u-kg"   aria-pressed="${unit==='kg'}">kg</button>
+      </div>
+      ${unit==='stlb' ? `
+      <div class="row">
+        <div><label class="f" for="wst">Stone</label><input type="number" id="wst" inputmode="numeric" value="${stVal}" ${can?'':'disabled'}></div>
+        <div><label class="f" for="wlb">Pounds</label><input type="number" id="wlb" inputmode="decimal" step="0.1" value="${lbVal}" ${can?'':'disabled'}></div>
+      </div>` : `
+      <div><label class="f" for="wkg">Weight (kg)</label><input type="number" id="wkg" inputmode="decimal" step="0.1" value="${kgVal}" ${can?'':'disabled'}></div>`}
+      <div style="height:12px"></div>
+      <label class="f" for="waist">Waist (inches)</label>
+      <input type="number" id="waist" inputmode="decimal" step="0.25" value="${r.waist_in ?? ''}" ${can?'':'disabled'}>
+      <div style="height:14px"></div>
+      <button class="btn" id="saveWeigh" ${can?'':'disabled'}>Save measurements</button>
+    </div>`;
+
+  $('#u-stlb').onclick = () => { unit='stlb'; localStorage.setItem('gbt.unit',unit); renderToday(); };
+  $('#u-kg').onclick   = () => { unit='kg';   localStorage.setItem('gbt.unit',unit); renderToday(); };
+
+  const btn = $('#saveWeigh');
+  if (btn) btn.onclick = () => {
+    let lb = null;
+    if (unit === 'stlb'){
+      const s = parseFloat($('#wst').value), p = parseFloat($('#wlb').value);
+      if (!isNaN(s) || !isNaN(p)) lb = (isNaN(s)?0:s)*14 + (isNaN(p)?0:p);
+    } else {
+      const k = parseFloat($('#wkg').value);
+      if (!isNaN(k)) lb = k * LB_PER_KG;
+    }
+    const w = parseFloat($('#waist').value);
+    r.weight_lb = lb;
+    r.waist_in  = isNaN(w) ? null : w;
+    queueSave(cursor);
+    toast('Measurements saved');
+    renderToday();
+  };
+}
+
+/* ---------- Progress ---------- */
+function renderProgress(){
+  const lw = latest('weight_lb'), lwa = latest('waist_in');
+  const cur = lw ? lw.weight_lb : CONFIG.start.lb;
+  const lost = CONFIG.start.lb - cur;
+  const toGo = cur - CONFIG.goal.lb;
+  const pace = paceOn(todayISO(), 'lb');
+  const vs = pace - cur;                 // positive = ahead of pace
+  const curWaist = lwa ? lwa.waist_in : CONFIG.start.waist;
+
+  $('#progStats').innerHTML = `
+    <div class="stat"><div class="k">Now</div><div class="v">${fmtWeight(cur)}</div>
+      <div class="s">${lw ? 'weighed ' + fmtShort(lw.day) : 'starting weight'}</div></div>
+    <div class="stat"><div class="k">Lost</div><div class="v ${lost>0?'good':''}">${lost>0?'−':''}${fmtDelta(lost)}</div>
+      <div class="s">since ${fmtShort(CONFIG.start.date)}</div></div>
+    <div class="stat"><div class="k">To go</div><div class="v">${fmtDelta(toGo)}</div>
+      <div class="s">to ${fmtWeight(CONFIG.goal.lb)}</div></div>
+    <div class="stat"><div class="k">Vs pace</div><div class="v ${vs>=0?'good':'bad'}">${vs>=0?'−':'+'}${fmtDelta(vs)}</div>
+      <div class="s">${vs>=0?'ahead of target':'behind target'}</div></div>
+    <div class="stat"><div class="k">Waist now</div><div class="v">${curWaist}"</div>
+      <div class="s">${lwa ? 'measured ' + fmtShort(lwa.day) : 'starting measurement'}</div></div>
+    <div class="stat"><div class="k">Inches to go</div><div class="v">${Math.max(0, Math.round((curWaist-CONFIG.goal.waist)*10)/10)}"</div>
+      <div class="s">to ${CONFIG.goal.waist}"</div></div>`;
+
+  drawChart('#weightChart', 'weight_lb', 'lb', '#FF6B35', true);
+  drawChart('#waistChart',  'waist_in',  'waist', '#38BDF8', true);
+
+  const rows = [
+    ['Start',                 CONFIG.start.date,     CONFIG.start.lb,     CONFIG.start.waist],
+    [CONFIG.milestone.label,  CONFIG.milestone.date, CONFIG.milestone.lb, CONFIG.milestone.waist],
+    [CONFIG.goal.label,       CONFIG.goal.date,      CONFIG.goal.lb,      CONFIG.goal.waist]
+  ];
+  $('#milestones').innerHTML = rows.map(([n,d,lb,w],i) => `
+    <div style="display:flex;justify-content:space-between;padding:9px 0;${i<rows.length-1?'border-bottom:1px solid var(--line)':''}">
+      <div><b>${n}</b><div class="small muted">${fmtShort(d)}</div></div>
+      <div style="text-align:right"><b>${fmtWeight(lb)}</b><div class="small muted">${w}" waist</div></div>
+    </div>`).join('');
+}
+
+function drawChart(sel, field, paceField, colour, showPace){
+  const svg = document.querySelector(sel);
+  const W = 340, H = svg.id === 'weightChart' ? 190 : 150;
+  const P = { l:34, r:8, t:12, b:22 };
+  const x0 = toDate(CONFIG.start.date), x1 = toDate(CONFIG.goal.date);
+  const span = x1 - x0;
+
+  const pts = measurements().filter(r => r[field] != null).map(r => ({ d:r.day, v:r[field] }));
+  const paceKey = field === 'weight_lb' ? 'lb' : 'waist';
+  const vals = [ CONFIG.start[paceKey], CONFIG.goal[paceKey], ...pts.map(p=>p.v) ];
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const padv = Math.max(2, (hi-lo)*0.12); lo -= padv; hi += padv;
+
+  const X = iso => P.l + ((toDate(iso) - x0)/span) * (W - P.l - P.r);
+  const Y = v   => P.t + (1 - (v - lo)/(hi - lo)) * (H - P.t - P.b);
+
+  let s = '';
+  // horizontal gridlines on round numbers — whole stone, 5 kg, or 2 inches
+  const ticks = [];
+  if (field === 'weight_lb'){
+    if (unit === 'kg'){
+      for (let k = Math.ceil((lo/LB_PER_KG)/5)*5; k <= hi/LB_PER_KG; k += 5) ticks.push({ v:k*LB_PER_KG, l:`${k}kg` });
+    } else {
+      for (let st = Math.ceil(lo/14); st <= hi/14; st++) ticks.push({ v:st*14, l:`${st}st` });
+    }
+  } else {
+    for (let v = Math.ceil(lo/3)*3; v <= hi; v += 3) ticks.push({ v, l:`${v}"` });
+  }
+  for (const t of ticks){
+    const y = Y(t.v);
+    s += `<line x1="${P.l}" y1="${y}" x2="${W-P.r}" y2="${y}" stroke="#26303D" stroke-width="1"/>`;
+    s += `<text x="${P.l-5}" y="${y+3.5}" text-anchor="end" font-size="9" fill="#8A99AB">${t.l}</text>`;
+  }
+  // month ticks
+  let m = new Date(x0.getFullYear(), x0.getMonth()+1, 1);
+  while (m < x1){
+    const iso = isoOf(m), x = X(iso);
+    s += `<text x="${x}" y="${H-6}" text-anchor="middle" font-size="9" fill="#8A99AB">${m.toLocaleDateString('en-GB',{month:'short'})}</text>`;
+    m = new Date(m.getFullYear(), m.getMonth()+1, 1);
+  }
+  // pace line
+  if (showPace){
+    const keys = [CONFIG.start, CONFIG.milestone, CONFIG.goal]
+      .map(k => `${X(k.date)},${Y(k[paceKey])}`).join(' ');
+    s += `<polyline points="${keys}" fill="none" stroke="#8A99AB" stroke-width="2" stroke-dasharray="5 4"/>`;
+  }
+  // today marker
+  const tISO = todayISO();
+  if (tISO >= CONFIG.start.date && tISO <= CONFIG.goal.date){
+    s += `<line x1="${X(tISO)}" y1="${P.t}" x2="${X(tISO)}" y2="${H-P.b}" stroke="#3A4756" stroke-width="1"/>`;
+  }
+  // actual line + dots
+  if (pts.length){
+    s += `<polyline points="${pts.map(p=>`${X(p.d)},${Y(p.v)}`).join(' ')}" fill="none" stroke="${colour}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    for (const p of pts) s += `<circle cx="${X(p.d)}" cy="${Y(p.v)}" r="3.5" fill="${colour}"/>`;
+  } else {
+    s += `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#8A99AB">No measurements yet — log Monday's weigh-in</text>`;
+  }
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = s;
+}
+
+/* ---------- History ---------- */
+function renderHistory(){
+  const first = weekStart(CONFIG.start.date), last = weekStart(todayISO());
+  const weeks = [];
+  for (let w = first; w <= last; w = addDays(w,7)) weeks.push(w);
+  weeks.reverse();
+
+  const done = weeks.map(weekStats).filter(s => s.complete);
+  const green = done.filter(s => s.pct >= CONFIG.threshold).length;
+  const allDays = Object.values(logs);
+  $('#histStats').innerHTML = `
+    <div class="stat"><div class="k">Green weeks</div><div class="v ${green?'good':''}">${green}/${done.length}</div>
+      <div class="s">${Math.round(CONFIG.threshold*100)}% or better</div></div>
+    <div class="stat"><div class="k">Walks logged</div><div class="v">${allDays.filter(r=>r.walk).length}</div>
+      <div class="s">30 minutes each</div></div>
+    <div class="stat"><div class="k">Core sessions</div><div class="v">${allDays.filter(r=>r.core).length}</div>
+      <div class="s">10 minutes each</div></div>
+    <div class="stat"><div class="k">Dry days</div><div class="v">${allDays.filter(r=>r.dry).length}</div>
+      <div class="s">total</div></div>`;
+
+  const rowsFor = [
+    ['Walk','walk'], ['Core','core'], ['Dry','dry'], ['Water','water']
+  ];
+  const t = todayISO();
+  $('#weekList').innerHTML = weeks.map(ws => {
+    const s = weekStats(ws);
+    const pct = Math.round(s.pct*100);
+    const cls = s.pct >= CONFIG.threshold ? 'good' : (s.complete ? 'bad' : 'warn');
+    const label = s.pct >= CONFIG.threshold ? (s.complete?'Green':'On track') : (s.complete?'Missed':'In progress');
+    const grid = rowsFor.map(([lbl,key]) => `
+      <div class="lbl">${lbl}</div>` +
+      s.days.map(d => `<div class="dot ${logs[d] && logs[d][key] ? 'on':''} ${d>t?'na':''}"></div>`).join('')
+    ).join('');
+    return `<div class="wk">
+      <div class="h">
+        <b>Week of ${fmtShort(ws)}</b>
+        <span class="pill ${cls}">${label} · ${pct}%</span>
+      </div>
+      <div class="grid">
+        <div></div>${['M','T','W','T','F','S','S'].map(x=>`<div class="dow">${x}</div>`).join('')}
+        ${grid}
+      </div>
+      <div class="small muted" style="margin-top:9px">
+        ${s.prep ? 'Meals prepped · ' : 'No meal prep · '}${s.weighed ? 'weighed in' : 'no weigh-in'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- CSV export ---------- */
+function exportCSV(){
+  const cols = ['day','walk','core','dry','water','prep','bonus','weight_lb','waist_in'];
+  const rows = Object.keys(logs).sort().map(d => cols.map(c => {
+    const v = logs[d][c];
+    if (v == null) return '';
+    return typeof v === 'string' ? `"${v.replace(/"/g,'""')}"` : v;
+  }).join(','));
+  const blob = new Blob([cols.join(',') + '\n' + rows.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `get-buff-tracker-${todayISO()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+$('#prevDay').onclick = () => { cursor = addDays(cursor,-1); renderToday(); };
+$('#nextDay').onclick = () => { cursor = addDays(cursor, 1); renderToday(); };
+$$('#nav button').forEach(b => b.onclick = () => { view = b.dataset.view; render(); });
+$('#exportBtn').onclick = exportCSV;
+
+async function startApp(){
+  await loadAll();
+  $('#auth').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  $('#nav').classList.remove('hidden');
+  render();
+}
+
+async function boot(){
+  if (!usingCloud()){
+    $('#signOutBtn').classList.add('hidden');
+    await startApp();
+    return;
+  }
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+
+  const { data:{ session } } = await sb.auth.getSession();
+  if (session){ sb.auth.__uid = session.user.id; await startApp(); }
+  else $('#auth').classList.remove('hidden');
+
+  sb.auth.onAuthStateChange((_e, s) => {
+    if (s){ sb.auth.__uid = s.user.id; startApp(); }
+  });
+
+  $('#sendLink').onclick = async () => {
+    const email = $('#email').value.trim();
+    if (!email) return;
+    $('#authMsg').textContent = 'Sending…';
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
+    $('#authMsg').textContent = error ? error.message : 'Check your email for the sign-in link.';
+  };
+  $('#signOutBtn').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+boot();
+
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
