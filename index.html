@@ -278,8 +278,8 @@ nav svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stro
 const CONFIG = {
   // Leave both blank to run on this device only (localStorage).
   // Fill them in after creating the Supabase project to sync phone + desktop.
-  supabaseUrl:     '',
-  supabaseAnonKey: '',
+  supabaseUrl:     'https://ohzjgvshzhyzihogqajp.supabase.co',
+  supabaseAnonKey: 'sb_publishable_W9gjdv4ZUDGwKJEQ7o_kcA_HFlWst_j',
 
   start:     { date:'2026-09-06', lb:256, waist:49 },
   milestone: { date:'2026-12-25', lb:224, waist:43, label:'Christmas' },
@@ -337,9 +337,10 @@ function fmtDelta(lb){
    Storage — Supabase when configured, otherwise this device
    ============================================================ */
 const BLANK = day => ({ day, walk:false, core:false, dry:false, water:false, prep:false, bonus:'', weight_lb:null, waist_in:null });
-const usingCloud = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
-
 let sb = null;          // supabase client
+let cloudOff = false;   // set when the library or network can't be reached
+const usingCloud = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey) && !cloudOff && !!sb;
+
 let logs = {};          // { '2026-09-06': row }
 
 const Local = {
@@ -766,16 +767,29 @@ async function startApp(){
   render();
 }
 
+const configured = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+
 async function boot(){
-  if (!usingCloud()){
+  if (!configured()){
     $('#signOutBtn').classList.add('hidden');
     await startApp();
     return;
   }
-  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-  sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+  // If the Supabase library or the network is unreachable, fall back to this device
+  // rather than showing a blank page.
+  try {
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+  } catch (e) {
+    cloudOff = true;
+    $('#signOutBtn').classList.add('hidden');
+    await startApp();
+    toast('Offline — saving on this device only');
+    return;
+  }
 
-  const { data:{ session } } = await sb.auth.getSession();
+  let session = null;
+  try { ({ data:{ session } } = await sb.auth.getSession()); } catch (e) { session = null; }
   if (session){ sb.auth.__uid = session.user.id; await startApp(); }
   else $('#auth').classList.remove('hidden');
 
