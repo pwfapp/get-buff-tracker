@@ -85,6 +85,22 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:1
 .habit .cnt{font-size:12px;font-weight:800;color:var(--muted);flex:0 0 auto}
 .habit[aria-pressed="true"] .cnt{color:var(--good)}
 
+/* grouped item: one roll-up row over its own sub-boxes */
+.group{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:6px;display:flex;flex-direction:column;gap:4px;
+}
+.group.done{background:rgba(34,197,94,.09);border-color:rgba(34,197,94,.4)}
+.group .habit{background:transparent;border:0;padding:9px 10px}
+.group .habit.head{cursor:default;padding-bottom:4px}
+.group .habit.head .box{border-color:var(--line)}
+.group.done .habit.head .box{background:var(--good);border-color:var(--good)}
+.group .habit.sub{width:auto;margin-left:14px;padding:9px 10px;border-left:2px solid var(--line);border-radius:0 11px 11px 0}
+.group .habit.sub .box{width:24px;height:24px;border-radius:8px}
+.group .habit.sub .txt b{font-size:14.5px;font-weight:600}
+.group .habit.sub[aria-pressed="true"]{background:rgba(34,197,94,.07)}
+.group .habit.sub[aria-pressed="true"] .box{background:var(--good);border-color:var(--good)}
+
 /* generic card */
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
 label.f{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600}
@@ -287,9 +303,18 @@ const CONFIG = {
 
   weighInDow:   1,    // 1 = Monday
   dryTarget:    4,    // alcohol-free days per week that count toward the score
+  scdTarget:    6,    // slow-carb days per week that count toward the score
   backfillDays: 3,    // how many days back you may still tick
   threshold:    0.80  // weekly % needed for a green week
 };
+
+// Slow-carb day: all three meals or it doesn't count. One tick, three sub-boxes.
+const SCD = [
+  { key:'scd_b', label:'SCD breakfast' },
+  { key:'scd_l', label:'SCD lunch' },
+  { key:'scd_d', label:'SCD dinner' }
+];
+const scdDone = r => !!(r && r.scd_b && r.scd_l && r.scd_d);
 
 const DAILY = [
   { key:'walk',  label:'30-minute walk',    sub:'Non-negotiable' },
@@ -336,7 +361,9 @@ function fmtDelta(lb){
 /* ============================================================
    Storage — Supabase when configured, otherwise this device
    ============================================================ */
-const BLANK = day => ({ day, walk:false, core:false, dry:false, water:false, prep:false, bonus:'', weight_lb:null, waist_in:null });
+const BLANK = day => ({ day, walk:false, core:false, dry:false, water:false, prep:false,
+                        scd_b:false, scd_l:false, scd_d:false,
+                        bonus:'', weight_lb:null, waist_in:null });
 let sb = null;          // supabase client
 let cloudOff = false;   // set when the library or network can't be reached
 const usingCloud = () => !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey) && !cloudOff && !!sb;
@@ -367,8 +394,9 @@ function queueSave(day){
 async function flush(){
   if (!usingCloud() || !pending.size) return;
   const rows = [...pending].map(d => {
-    const { day, walk, core, dry, water, prep, bonus, weight_lb, waist_in } = logs[d];
-    return { day, walk, core, dry, water, prep, bonus, weight_lb, waist_in, user_id: sb.auth.__uid };
+    const { day, walk, core, dry, water, prep, scd_b, scd_l, scd_d, bonus, weight_lb, waist_in } = logs[d];
+    return { day, walk, core, dry, water, prep, scd_b, scd_l, scd_d, bonus, weight_lb, waist_in,
+             user_id: sb.auth.__uid };
   });
   pending.clear();
   const { error } = await sb.from('logs').upsert(rows, { onConflict:'user_id,day' });
@@ -385,25 +413,28 @@ function weekStats(ws, today){
   const t = today || todayISO();
   // Only days that have actually happened AND are on/after the start date can be expected of you.
   const elapsed = days.filter(d => d <= t && d >= CONFIG.start.date).length;
-  let walk=0, core=0, water=0, dry=0, prep=false, weighed=false;
+  let walk=0, core=0, water=0, dry=0, scd=0, prep=false, weighed=false;
   for (const d of days){
     const r = logs[d]; if (!r) continue;
     if (r.walk) walk++;
     if (r.core) core++;
     if (r.water) water++;
     if (r.dry) dry++;
+    if (scdDone(r)) scd++;          // all three meals or it doesn't count
     if (r.prep) prep = true;
     if (r.weight_lb != null) weighed = true;
   }
   const dryCounted = Math.min(dry, CONFIG.dryTarget);
+  const scdCounted = Math.min(scd, CONFIG.scdTarget);
   // Meal prep is a once-a-week job — it only starts counting from Friday, so doing it
   // late in the week doesn't drag Monday's score down.
   const prepCounts = elapsed >= 5;
-  const earned = walk + core + water + dryCounted + (prepCounts && prep ? 1:0) + (weighed?1:0);
-  const target = elapsed*3 + Math.min(CONFIG.dryTarget, elapsed) + (elapsed>0?1:0) + (prepCounts?1:0);
+  const earned = walk + core + water + dryCounted + scdCounted + (prepCounts && prep ? 1:0) + (weighed?1:0);
+  const target = elapsed*3 + Math.min(CONFIG.dryTarget, elapsed) + Math.min(CONFIG.scdTarget, elapsed)
+               + (elapsed>0?1:0) + (prepCounts?1:0);
   const pct = target ? Math.min(1, earned/target) : 0;
-  return { days, elapsed, walk, core, water, dry, dryCounted, prep, weighed, earned, target, pct,
-           complete: elapsed === 7 };
+  return { days, elapsed, walk, core, water, dry, dryCounted, scd, scdCounted, prep, weighed,
+           earned, target, pct, complete: elapsed === 7 };
 }
 
 /* ============================================================
@@ -509,6 +540,9 @@ function renderToday(){
       <span class="cnt">${cnt}</span>`;
     b.onclick = () => { r[h.key] = !r[h.key]; queueSave(cursor); renderToday(); };
     list.appendChild(b);
+
+    // Slow-carb day sits with the other non-negotiables, right after core.
+    if (h.key === 'core') list.appendChild(buildScd(r, can, st, tick));
   }
 
   // weekly meal prep
@@ -529,6 +563,35 @@ function renderToday(){
   bonus.oninput = () => { r.bonus = bonus.value; queueSave(cursor); };
 
   renderWeighBlock(r, can);
+}
+
+// Slow-carb day: a roll-up row (not clickable — it just reports) over three meal boxes.
+// The day only counts when all three are ticked.
+function buildScd(r, can, st, tick){
+  const done  = scdDone(r);
+  const count = SCD.filter(m => r[m.key]).length;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'group' + (done ? ' done' : '');
+
+  const head = document.createElement('div');
+  head.className = 'habit head';
+  head.setAttribute('aria-pressed', done);
+  head.innerHTML = `<span class="box">${tick}</span>
+    <span class="txt"><b>Slow-carb day</b><span>${done ? 'All three meals — day counts' : `${count} of 3 meals · needs all three`}</span></span>
+    <span class="cnt">${st.scd}/${CONFIG.scdTarget}</span>`;
+  wrap.appendChild(head);
+
+  for (const m of SCD){
+    const b = document.createElement('button');
+    b.className = 'habit sub';
+    b.setAttribute('aria-pressed', !!r[m.key]);
+    if (!can) b.disabled = true;
+    b.innerHTML = `<span class="box">${tick}</span><span class="txt"><b>${m.label}</b></span>`;
+    b.onclick = () => { r[m.key] = !r[m.key]; queueSave(cursor); renderToday(); };
+    wrap.appendChild(b);
+  }
+  return wrap;
 }
 
 function renderWeighBlock(r, can){
@@ -703,12 +766,15 @@ function renderHistory(){
       <div class="s">30 minutes each</div></div>
     <div class="stat"><div class="k">Core sessions</div><div class="v">${allDays.filter(r=>r.core).length}</div>
       <div class="s">10 minutes each</div></div>
+    <div class="stat"><div class="k">Slow-carb days</div><div class="v">${allDays.filter(scdDone).length}</div>
+      <div class="s">all three meals</div></div>
     <div class="stat"><div class="k">Dry days</div><div class="v">${allDays.filter(r=>r.dry).length}</div>
       <div class="s">total</div></div>`;
 
   const rowsFor = [
-    ['Walk','walk'], ['Core','core'], ['Dry','dry'], ['Water','water']
+    ['Walk','walk'], ['Core','core'], ['Slow-carb','__scd'], ['Dry','dry'], ['Water','water']
   ];
+  const ticked = (d,key) => key === '__scd' ? scdDone(logs[d]) : !!(logs[d] && logs[d][key]);
   const t = todayISO();
   $('#weekList').innerHTML = weeks.map(ws => {
     const s = weekStats(ws);
@@ -717,7 +783,7 @@ function renderHistory(){
     const label = s.pct >= CONFIG.threshold ? (s.complete?'Green':'On track') : (s.complete?'Missed':'In progress');
     const grid = rowsFor.map(([lbl,key]) => `
       <div class="lbl">${lbl}</div>` +
-      s.days.map(d => `<div class="dot ${logs[d] && logs[d][key] ? 'on':''} ${d>t?'na':''}"></div>`).join('')
+      s.days.map(d => `<div class="dot ${ticked(d,key) ? 'on':''} ${d>t?'na':''}"></div>`).join('')
     ).join('');
     return `<div class="wk">
       <div class="h">
@@ -737,7 +803,7 @@ function renderHistory(){
 
 /* ---------- CSV export ---------- */
 function exportCSV(){
-  const cols = ['day','walk','core','dry','water','prep','bonus','weight_lb','waist_in'];
+  const cols = ['day','walk','core','scd_b','scd_l','scd_d','dry','water','prep','bonus','weight_lb','waist_in'];
   const rows = Object.keys(logs).sort().map(d => cols.map(c => {
     const v = logs[d][c];
     if (v == null) return '';
