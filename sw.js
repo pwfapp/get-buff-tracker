@@ -1,5 +1,5 @@
 // Minimal offline shell. Bump CACHE when you change index.html.
-const CACHE = 'gbt-v2';
+const CACHE = 'gbt-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
